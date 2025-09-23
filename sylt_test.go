@@ -587,6 +587,15 @@ func TestReadEncodedText(t *testing.T) {
 			wantErr:  true,
 		},
 		{
+			name:     "Position at end of data",
+			data:     []byte("Hello"),
+			pos:      5,
+			encoding: 0x03,
+			wantText: "",
+			wantPos:  5,
+			wantErr:  true,
+		},
+		{
 			name:     "Position beyond data",
 			data:     []byte("Hello"),
 			pos:      10,
