@@ -512,7 +512,7 @@ func TestSkipDescriptor(t *testing.T) {
 			data:       []byte{0x48, 0x00, 0x65, 0x00, 0x00, 0x00, 0x57, 0x00},
 			pos:        0,
 			terminator: []byte{0x00, 0x00},
-			want:       5, // Data: H(0x48) \0(0x00) e(0x65) \0(0x00) \0(0x00) \0(0x00) - match at pos 3-4, returns 3+2=5
+			want:       5, // data is H\x00e\x00\x00\x00W\x00. Terminator \x00\x00 found at index 3. Returns 3+2=5
 		},
 		{
 			name:       "Terminator not found",
