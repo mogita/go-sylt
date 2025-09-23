@@ -561,7 +561,7 @@ func TestReadEncodedText(t *testing.T) {
 		},
 		{
 			name:     "UTF-16 text with terminator",
-			data:     []byte("H\x00i\x00\x00\x00World"),
+			data:     []byte{'H', 0x00, 'i', 0x00, 0x00, 0x00, 'W', 'o', 'r', 'l', 'd'},
 			pos:      0,
 			encoding: 0x01,
 			wantText: "Hi",
