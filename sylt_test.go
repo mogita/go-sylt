@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 )
@@ -383,6 +384,55 @@ func TestDecodeText(t *testing.T) {
 			want:     "Hi",
 			wantErr:  false,
 		},
+		{
+			name:     "UTF-16 with BOM LE",
+			data:     []byte{0xFF, 0xFE, 0x48, 0x00, 0x69, 0x00}, // BOM + "Hi" in UTF-16LE
+			encoding: 0x01,
+			want:     "Hi",
+			wantErr:  false,
+		},
+		{
+			name:     "UTF-16 with BOM BE",
+			data:     []byte{0xFE, 0xFF, 0x00, 0x48, 0x00, 0x69}, // BOM + "Hi" in UTF-16BE
+			encoding: 0x01,
+			want:     "Hi",
+			wantErr:  false,
+		},
+		{
+			name:     "UTF-16 too short",
+			data:     []byte{0x48}, // Single byte
+			encoding: 0x01,
+			want:     "",
+			wantErr:  true,
+		},
+		{
+			name:     "UTF-16BE odd length",
+			data:     []byte{0x00, 0x48, 0x00}, // 3 bytes
+			encoding: 0x02,
+			want:     "",
+			wantErr:  true,
+		},
+		{
+			name:     "Unsupported encoding",
+			data:     []byte("test"),
+			encoding: 0xFF,
+			want:     "",
+			wantErr:  true,
+		},
+		{
+			name:     "Empty data UTF-8",
+			data:     []byte{},
+			encoding: 0x03,
+			want:     "",
+			wantErr:  false,
+		},
+		{
+			name:     "Empty data UTF-16",
+			data:     []byte{},
+			encoding: 0x01,
+			want:     "",
+			wantErr:  false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -394,6 +444,171 @@ func TestDecodeText(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("decodeText() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetTextTerminator(t *testing.T) {
+	tests := []struct {
+		name     string
+		encoding byte
+		want     []byte
+	}{
+		{
+			name:     "Latin1",
+			encoding: 0x00,
+			want:     []byte{0x00},
+		},
+		{
+			name:     "UTF-16 with BOM",
+			encoding: 0x01,
+			want:     []byte{0x00, 0x00},
+		},
+		{
+			name:     "UTF-16BE",
+			encoding: 0x02,
+			want:     []byte{0x00, 0x00},
+		},
+		{
+			name:     "UTF-8",
+			encoding: 0x03,
+			want:     []byte{0x00},
+		},
+		{
+			name:     "Unknown encoding",
+			encoding: 0xFF,
+			want:     []byte{0x00}, // fallback
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getTextTerminator(tt.encoding)
+			if !bytes.Equal(got, tt.want) {
+				t.Errorf("getTextTerminator(%d) = %v, want %v", tt.encoding, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSkipDescriptor(t *testing.T) {
+	tests := []struct {
+		name       string
+		data       []byte
+		pos        int
+		terminator []byte
+		want       int
+	}{
+		{
+			name:       "Single byte terminator found",
+			data:       []byte{0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x00, 0x57, 0x6f, 0x72, 0x6c, 0x64},
+			pos:        0,
+			terminator: []byte{0x00},
+			want:       6,
+		},
+		{
+			name:       "Double byte terminator found",
+			data:       []byte{0x48, 0x00, 0x65, 0x00, 0x00, 0x00, 0x57, 0x00},
+			pos:        0,
+			terminator: []byte{0x00, 0x00},
+			want:       5, // Data: H(0x48) \0(0x00) e(0x65) \0(0x00) \0(0x00) \0(0x00) - match at pos 3-4, returns 3+2=5
+		},
+		{
+			name:       "Terminator not found",
+			data:       []byte{0x48, 0x65, 0x6c, 0x6c, 0x6f},
+			pos:        0,
+			terminator: []byte{0x00},
+			want:       5,
+		},
+		{
+			name:       "Start from middle",
+			data:       []byte{0x48, 0x65, 0x6c, 0x00, 0x6f},
+			pos:        2,
+			terminator: []byte{0x00},
+			want:       4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := skipDescriptor(tt.data, tt.pos, tt.terminator)
+			if got != tt.want {
+				t.Errorf("skipDescriptor() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadEncodedText(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     []byte
+		pos      int
+		encoding byte
+		wantText string
+		wantPos  int
+		wantErr  bool
+	}{
+		{
+			name:     "UTF-8 text with terminator",
+			data:     []byte("Hello\x00World"),
+			pos:      0,
+			encoding: 0x03,
+			wantText: "Hello",
+			wantPos:  6,
+			wantErr:  false,
+		},
+		{
+			name:     "UTF-16 text with terminator",
+			data:     []byte("H\x00i\x00\x00\x00World"),
+			pos:      0,
+			encoding: 0x01,
+			wantText: "Hi",
+			wantPos:  6,
+			wantErr:  false,
+		},
+		{
+			name:     "Text without terminator",
+			data:     []byte("Hello"),
+			pos:      0,
+			encoding: 0x03,
+			wantText: "Hello",
+			wantPos:  5,
+			wantErr:  false,
+		},
+		{
+			name:     "Empty data",
+			data:     []byte{},
+			pos:      0,
+			encoding: 0x03,
+			wantText: "",
+			wantPos:  0,
+			wantErr:  true,
+		},
+		{
+			name:     "Position beyond data",
+			data:     []byte("Hello"),
+			pos:      10,
+			encoding: 0x03,
+			wantText: "",
+			wantPos:  10,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotText, gotPos, err := readEncodedText(tt.data, tt.pos, tt.encoding)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readEncodedText() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotText != tt.wantText {
+				t.Errorf("readEncodedText() text = %v, want %v", gotText, tt.wantText)
+			}
+			if gotPos != tt.wantPos {
+				t.Errorf("readEncodedText() pos = %v, want %v", gotPos, tt.wantPos)
 			}
 		})
 	}
