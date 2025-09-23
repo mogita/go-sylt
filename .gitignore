@@ -1,0 +1,31 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+build
+go-sylt
+
+# Test binary, built with `go test -c`
+*.test
+cover.html
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Environment variables file
+.env
+.env*
+
+# IDE settings
+.vscode/
+.history/
+
+# FS or IDE related
+.DS_Store
+.idea
+
+# Output of this project
+*.log
+__debug_bin*
