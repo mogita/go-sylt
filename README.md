@@ -1,6 +1,13 @@
-# go-sylt
-
-A command line tool in Go that writes synced lyrics to MP3 files in SYLT (SYnchronized Lyrics/Text) format.
+<p align="center">
+  <h3 align="center">GO SYLT</h3>
+  <p align="center">A pretty convenient CLI tool that reads and writes synced lyrics to MP3 files in SYLT (SYnchronized Lyrics/Text) format.</p>
+  <p align="center">
+    <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square"></a>
+    <a href="https://goreportcard.com/report/github.com/mogita/go-sylt"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/mogita/go-sylt?style=flat-square"></a>
+    <a href="https://coveralls.io/github/mogita/go-sylt?branch=main"><img alt="Coverage Status" src="https://img.shields.io/coveralls/mogita/go-sylt/main.svg?style=flat-square"></a>
+    <a href="https://godoc.org/github.com/mogita/go-sylt"><img alt="GoDoc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square"></a>
+  </p>
+</p>
 
 ## Features
 
