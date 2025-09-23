@@ -6,6 +6,10 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   test:
     name: Test
@@ -173,5 +177,5 @@ jobs:
         generate_release_notes: true
         draft: false
         prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        overwrite_files: true
+        token: ${{ secrets.GITHUB_TOKEN }}
