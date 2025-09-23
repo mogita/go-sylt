@@ -61,6 +61,11 @@ The tool creates a new MP3 file with the same name as the input file but with " 
 
 - [github.com/bogem/id3v2/v2](https://github.com/bogem/id3v2) - ID3v2 tag manipulation
 
+
+## Contributing
+
+Contributions are welcome! Should you find any issues or have any suggestions, kindly submit an issue or PR with the provided templates. Thank you!
+
 ## Development
 
 - Go 1.21 or above
@@ -74,9 +79,9 @@ go test -v
 golangci-lint run
 ```
 
-## Contributing
+## Releasing
 
-Contributions are welcome! Should you find any issues or have any suggestions, kindly submit an issue or PR with the provided templates. Thank you!
+Visit the [Releases](https://github.com/mogita/go-sylt/releases) page, create a release on the `main` branch with a tag in the format of `X.Y.Z` or `X.Y.Z-rc1`. The workflow will automatically build and upload the binaries.
 
 ## License
 
