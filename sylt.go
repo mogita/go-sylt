@@ -262,10 +262,7 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 		return fmt.Errorf("failed to create output file: %v", err)
 	}
 
-	// Close current tag and open the new file
-	if closeErr := tag.Close(); closeErr != nil {
-		return fmt.Errorf("failed to close original MP3 file: %v", closeErr)
-	}
+	// The tag will be closed by the defer function
 
 	// Open the new file and add SYLT frame
 	newTag, err := id3v2.Open(outputPath, id3v2.Options{Parse: true})
