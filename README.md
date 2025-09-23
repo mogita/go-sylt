@@ -35,6 +35,8 @@ go build
 go-sylt [--lang <code>] <mp3_file> [lyrics_file]
 ```
 
+> Currently `go-sylt` supports ID3v2.3 and ID3v2.4 tags only. For MP3 files with older or unsupported ID3 versions, please convert them to a supported version first. You can use tools like [Kid3](https://kid3.kde.org) for this purpose.
+
 ### Examples
 
 ```bash
