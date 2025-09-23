@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' && github.event.base_ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        go-version: ['1.21', '1.22', '1.23', '1.24', '1.25']
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Run tests
+      run: go test -v -race ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' && github.event.base_ref == 'refs/heads/main'
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.21-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' && github.event.base_ref == 'refs/heads/main'
+    needs: [test, lint]
+    
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.21-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.21-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Get version from tag
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Build binaries
+      run: |
+        VERSION=${{ steps.version.outputs.VERSION }}
+
+        # Create platform-specific directories
+        mkdir -p dist/linux-amd64 dist/linux-arm64 dist/darwin-amd64 dist/darwin-arm64 dist/windows-amd64 dist/windows-arm64
+
+        # Build for all platforms with version and platform injection
+        GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION -X main.platform=linux/amd64" -o dist/linux-amd64/go-sylt .
+        GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=$VERSION -X main.platform=linux/arm64" -o dist/linux-arm64/go-sylt .
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION -X main.platform=darwin/amd64" -o dist/darwin-amd64/go-sylt .
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=$VERSION -X main.platform=darwin/arm64" -o dist/darwin-arm64/go-sylt .
+        GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=$VERSION -X main.platform=windows/amd64" -o dist/windows-amd64/go-sylt.exe .
+        GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X main.version=$VERSION -X main.platform=windows/arm64" -o dist/windows-arm64/go-sylt.exe .
+
+    - name: Create archives
+      run: |
+        cd dist
+        VERSION=${{ steps.version.outputs.VERSION }}
+
+        # Create tar.gz archives for each binary
+        tar -czf go-sylt-$VERSION-linux-amd64.tar.gz -C linux-amd64 go-sylt
+        tar -czf go-sylt-$VERSION-linux-arm64.tar.gz -C linux-arm64 go-sylt
+        tar -czf go-sylt-$VERSION-darwin-amd64.tar.gz -C darwin-amd64 go-sylt
+        tar -czf go-sylt-$VERSION-darwin-arm64.tar.gz -C darwin-arm64 go-sylt
+        tar -czf go-sylt-$VERSION-windows-amd64.tar.gz -C windows-amd64 go-sylt.exe
+        tar -czf go-sylt-$VERSION-windows-arm64.tar.gz -C windows-arm64 go-sylt.exe
+
+        # List created files
+        ls -la *.tar.gz
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          dist/go-sylt-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz
+          dist/go-sylt-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz
+          dist/go-sylt-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz
+          dist/go-sylt-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz
+          dist/go-sylt-${{ steps.version.outputs.VERSION }}-windows-amd64.tar.gz
+          dist/go-sylt-${{ steps.version.outputs.VERSION }}-windows-arm64.tar.gz
+        generate_release_notes: true
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

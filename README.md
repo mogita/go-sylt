@@ -5,7 +5,6 @@
     <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square"></a>
     <a href="https://goreportcard.com/report/github.com/mogita/go-sylt"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/mogita/go-sylt?style=flat-square"></a>
     <a href="https://coveralls.io/github/mogita/go-sylt?branch=main"><img alt="Coverage Status" src="https://img.shields.io/coveralls/mogita/go-sylt/main.svg?style=flat-square"></a>
-    <a href="https://godoc.org/github.com/mogita/go-sylt"><img alt="GoDoc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square"></a>
   </p>
 </p>
 
@@ -62,9 +61,14 @@ The tool creates a new MP3 file with the same name as the input file but with " 
 
 - [github.com/bogem/id3v2/v2](https://github.com/bogem/id3v2) - ID3v2 tag manipulation
 
+
+## Contributing
+
+Contributions are welcome! Should you find any issues or have any suggestions, kindly submit an issue or PR with the provided templates. Thank you!
+
 ## Development
 
-- Go 1.25.1
+- Go 1.21 or above
 - [golangci-lint](https://golangci-lint.run/) for linting
 
 ```bash
@@ -75,9 +79,9 @@ go test -v
 golangci-lint run
 ```
 
-## Contributing
+## Releasing
 
-Contributions are welcome! Should you find any issues or have any suggestions, kindly submit an issue or PR with the provided templates. Thank you!
+Visit the [Releases](https://github.com/mogita/go-sylt/releases) page, create a release on the `main` branch with a tag in the format of `X.Y.Z` or `X.Y.Z-rc1`. The workflow will automatically build and upload the binaries.
 
 ## License
 

@@ -6,18 +6,32 @@ import (
 	"os"
 )
 
+// Build-time variables set via -ldflags
+var (
+	version  = "dev"
+	platform = "unknown"
+)
+
 func main() {
 	var lang string
+	var showVersion bool
 	flag.StringVar(&lang, "lang", "und", "3-letter ISO 639-2 language code")
+	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("go-sylt version %s %s\n", version, platform)
+		os.Exit(0)
+	}
 
 	args := flag.Args()
 
 	switch len(args) {
 	case 0:
-		fmt.Fprintf(os.Stderr, "Usage: %s [--lang <code>] <mp3_file> [lyrics_file]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [--lang <code>] [--version] <mp3_file> [lyrics_file]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  With lyrics_file: Add SYLT lyrics to MP3 file\n")
 		fmt.Fprintf(os.Stderr, "  Without lyrics_file: Read and display existing SYLT lyrics from MP3 file\n")
+		fmt.Fprintf(os.Stderr, "  --version: Show version information\n")
 		os.Exit(1)
 	case 1:
 		// Read and display existing SYLT from MP3 file

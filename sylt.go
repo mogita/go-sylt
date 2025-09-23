@@ -240,7 +240,11 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open MP3 file: %v", err)
 	}
-	defer tag.Close()
+	defer func() {
+		if closeErr := tag.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close MP3 file: %v\n", closeErr)
+		}
+	}()
 
 	// Build and add SYLT frame
 	payload := buildSYLT(entries, lang)
@@ -259,14 +263,20 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 	}
 
 	// Close current tag and open the new file
-	tag.Close()
+	if closeErr := tag.Close(); closeErr != nil {
+		return fmt.Errorf("failed to close original MP3 file: %v", closeErr)
+	}
 
 	// Open the new file and add SYLT frame
 	newTag, err := id3v2.Open(outputPath, id3v2.Options{Parse: true})
 	if err != nil {
 		return fmt.Errorf("failed to open output MP3 file: %v", err)
 	}
-	defer newTag.Close()
+	defer func() {
+		if closeErr := newTag.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close output MP3 file: %v\n", closeErr)
+		}
+	}()
 
 	// Add SYLT frame to new file
 	newTag.AddFrame("SYLT", id3v2.UnknownFrame{Body: payload})
@@ -501,7 +511,11 @@ func readSYLT(mp3File string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open MP3 file: %v", err)
 	}
-	defer tag.Close()
+	defer func() {
+		if closeErr := tag.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close MP3 file: %v\n", closeErr)
+		}
+	}()
 
 	// Get all SYLT frames
 	syltFrames := tag.GetFrames("SYLT")
