@@ -29,3 +29,4 @@ cover.html
 # Output of this project
 *.log
 __debug_bin*
+docs/
