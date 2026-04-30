@@ -11,7 +11,7 @@
 ## Features
 
 - Supported input formats: LRC, SRT, and VTT
-- Configurable language codes (ISO 639-2 format)
+- Configurable language codes (case-insensitive 3-letter ISO 639-2 codes, e.g. `eng`, `zho`, `und`)
 - Read and display existing SYLT lyrics from MP3 files
 - Creates output files with " - sylt" suffix to preserve originals
 
@@ -53,11 +53,38 @@ go-sylt [--lang <code>] <mp3_file> [lyrics_file]
 ./go-sylt song.mp3
 ```
 
+### Language codes
+
+`--lang` accepts any 3-letter ISO 639-2 code and is case-insensitive (`ENG`, `Eng`, and `eng` are all accepted and stored as `eng`). Common values:
+
+- `eng` — English
+- `zho` — Chinese
+- `jpn` — Japanese
+- `kor` — Korean
+- `spa` — Spanish
+- `fra` — French
+- `deu` — German
+- `und` — undetermined (default)
+
+For the full list, see the [ISO 639-2 language code list](https://www.loc.gov/standards/iso639-2/php/code_list.php).
+
 ## Output
 
 The tool creates a new MP3 file with the same name as the input file but with " - sylt" appended before the extension. For example:
 
 - Input: `song.mp3` → Output: `song - sylt.mp3`
+
+## Encoding
+
+When writing SYLT frames, `go-sylt` always uses:
+
+- **Text encoding:** UTF-8 (ID3v2 encoding byte `0x03`)
+- **Timestamp format:** absolute milliseconds (`0x02`)
+- **Content type:** lyrics (`0x01`)
+
+This matches the format used by most modern players and avoids surrogate-pair pitfalls that affect UTF-16 handling. When reading SYLT frames, all four ID3v2 text encodings are supported (ISO-8859-1, UTF-16 with BOM, UTF-16 big-endian, UTF-8) so files written by other tools are readable.
+
+If you need to write a non-UTF-8 SYLT frame, please open an issue describing your use case.
 
 ## Credits
 

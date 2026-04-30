@@ -714,3 +714,35 @@ func TestReadEncodedText(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeLanguageCode(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"eng", "eng", false},
+		{"ENG", "eng", false},
+		{"Eng", "eng", false},
+		{"zho", "zho", false},
+		{"ZHO", "zho", false},
+		{"und", "und", false},
+		{"en", "", true},   // too short
+		{"engl", "", true}, // too long
+		{"e1g", "", true},  // contains digit
+		{"e-g", "", true},  // contains hyphen
+		{"", "", true},     // empty
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := normalizeLanguageCode(tt.in)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("normalizeLanguageCode(%q) err = %v, wantErr %v", tt.in, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("normalizeLanguageCode(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
