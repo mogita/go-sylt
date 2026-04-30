@@ -265,6 +265,18 @@ Line one`,
 			},
 			wantErr: false,
 		},
+		{
+			name: "VTT body containing timestamp-like text is not re-parsed",
+			content: `WEBVTT
+
+00:01.000 --> 00:02.000
+00:99.999 --> 00:50.000
+followup line`,
+			want: []LyricEntry{
+				{Text: "00:99.999 --> 00:50.000 followup line", Ms: 1000},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

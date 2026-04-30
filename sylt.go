@@ -194,7 +194,8 @@ func parseVTT(content string) ([]LyricEntry, error) {
 		milliseconds, _ := strconv.Atoi(matches[4])
 
 		text := ""
-		for j := i + 1; j < len(lines); j++ {
+		j := i + 1
+		for ; j < len(lines); j++ {
 			nextLine := strings.TrimSpace(lines[j])
 			if nextLine == "" {
 				break
@@ -204,6 +205,7 @@ func parseVTT(content string) ([]LyricEntry, error) {
 			}
 			text += nextLine
 		}
+		i = j // skip past consumed text lines so they aren't re-scanned
 
 		if text == "" {
 			continue
