@@ -11,7 +11,7 @@
 ## Features
 
 - Supported input formats: LRC, SRT, and VTT
-- Configurable language codes (case-insensitive 3-letter ISO 639-2/B codes, e.g. `eng`, `zho`, `und`)
+- Configurable language codes (case-insensitive 3-letter ISO 639-2 codes, e.g. `eng`, `zho`, `und`)
 - Read and display existing SYLT lyrics from MP3 files
 - Creates output files with " - sylt" suffix to preserve originals
 
