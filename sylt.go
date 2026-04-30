@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -235,36 +236,18 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 		return fmt.Errorf("failed to parse lyrics: %v", err)
 	}
 
-	// Open MP3 file to read tags
-	tag, err := id3v2.Open(mp3File, id3v2.Options{Parse: true})
-	if err != nil {
-		return fmt.Errorf("failed to open MP3 file: %v", err)
-	}
-	defer func() {
-		if closeErr := tag.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close MP3 file: %v\n", closeErr)
-		}
-	}()
-
-	// Build and add SYLT frame
+	// Build SYLT payload
 	payload := buildSYLT(entries, lang)
-	tag.AddFrame("SYLT", id3v2.UnknownFrame{Body: payload})
 
-	// Generate output path and save
+	// Generate output path
 	outputPath := getOutputPath(mp3File)
 
-	// Copy original file to new location first
-	input, err := os.ReadFile(mp3File)
-	if err != nil {
-		return fmt.Errorf("failed to read original MP3 file: %v", err)
-	}
-	if err := os.WriteFile(outputPath, input, 0644); err != nil {
-		return fmt.Errorf("failed to create output file: %v", err)
+	// Stream-copy the source MP3 to the output path
+	if err := copyFile(mp3File, outputPath); err != nil {
+		return fmt.Errorf("failed to copy MP3 to output: %v", err)
 	}
 
-	// The tag will be closed by the defer function
-
-	// Open the new file and add SYLT frame
+	// Open the copy and add the SYLT frame
 	newTag, err := id3v2.Open(outputPath, id3v2.Options{Parse: true})
 	if err != nil {
 		return fmt.Errorf("failed to open output MP3 file: %v", err)
@@ -275,7 +258,6 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 		}
 	}()
 
-	// Add SYLT frame to new file
 	newTag.AddFrame("SYLT", id3v2.UnknownFrame{Body: payload})
 
 	if err := newTag.Save(); err != nil {
@@ -283,6 +265,26 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 	}
 
 	return nil
+}
+
+// copyFile streams src to dst using io.Copy to avoid loading large files into memory.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 // parseSYLTFrame parses SYLT frame data and returns entries and language code
