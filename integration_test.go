@@ -97,3 +97,77 @@ func TestProcessFiles_LargeFileRoundtrip(t *testing.T) {
 		t.Errorf("output size %d too small; want >= %d", info.Size(), padSize)
 	}
 }
+
+func TestProcessFiles_RoundTripSYLT(t *testing.T) {
+	tempDir := t.TempDir()
+	mp3Path := filepath.Join(tempDir, "song.mp3")
+	writeMinimalMP3(t, mp3Path)
+
+	lyricsPath := filepath.Join(tempDir, "song.lrc")
+	lrcContent := "[00:01.000]Hello\n[00:02.500]World\n[00:10.250]End"
+	if err := os.WriteFile(lyricsPath, []byte(lrcContent), 0644); err != nil {
+		t.Fatalf("failed to write lyrics: %v", err)
+	}
+
+	if err := processFiles(mp3Path, lyricsPath, "eng"); err != nil {
+		t.Fatalf("processFiles failed: %v", err)
+	}
+
+	outputPath := getOutputPath(mp3Path)
+	tag, err := id3v2.Open(outputPath, id3v2.Options{Parse: true})
+	if err != nil {
+		t.Fatalf("failed to open output: %v", err)
+	}
+	defer tag.Close()
+
+	frames := tag.GetFrames("SYLT")
+	if len(frames) != 1 {
+		t.Fatalf("expected 1 SYLT frame, got %d", len(frames))
+	}
+
+	uf, ok := frames[0].(id3v2.UnknownFrame)
+	if !ok {
+		t.Fatalf("frame is not UnknownFrame: %T", frames[0])
+	}
+
+	entries, lang, err := parseSYLTFrame(uf.Body)
+	if err != nil {
+		t.Fatalf("parseSYLTFrame failed: %v", err)
+	}
+	if lang != "eng" {
+		t.Errorf("lang = %q, want %q", lang, "eng")
+	}
+
+	want := []LyricEntry{
+		{Text: "Hello", Ms: 1000},
+		{Text: "World", Ms: 2500},
+		{Text: "End", Ms: 10250},
+	}
+	if len(entries) != len(want) {
+		t.Fatalf("got %d entries, want %d", len(entries), len(want))
+	}
+	for i := range want {
+		if entries[i] != want[i] {
+			t.Errorf("entry[%d] = %+v, want %+v", i, entries[i], want[i])
+		}
+	}
+}
+
+func TestReadSYLT_AfterProcess(t *testing.T) {
+	tempDir := t.TempDir()
+	mp3Path := filepath.Join(tempDir, "song.mp3")
+	writeMinimalMP3(t, mp3Path)
+
+	lyricsPath := filepath.Join(tempDir, "song.lrc")
+	if err := os.WriteFile(lyricsPath, []byte("[00:01.00]Hello"), 0644); err != nil {
+		t.Fatalf("write lyrics: %v", err)
+	}
+	if err := processFiles(mp3Path, lyricsPath, "und"); err != nil {
+		t.Fatalf("processFiles: %v", err)
+	}
+
+	outputPath := getOutputPath(mp3Path)
+	if err := readSYLT(outputPath); err != nil {
+		t.Errorf("readSYLT returned error on file produced by processFiles: %v", err)
+	}
+}
