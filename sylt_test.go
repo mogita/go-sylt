@@ -86,6 +86,36 @@ func TestParseLRC(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name:    "multiple timestamps on one line",
+			content: `[00:10.00][00:20.00]Chorus line`,
+			want: []LyricEntry{
+				{Text: "Chorus line", Ms: 10000},
+				{Text: "Chorus line", Ms: 20000},
+			},
+			wantErr: false,
+		},
+		{
+			name: "mixed single and multi-timestamp lines",
+			content: `[00:05.00]Intro
+[00:10.00][00:20.00][00:30.00]Repeated`,
+			want: []LyricEntry{
+				{Text: "Intro", Ms: 5000},
+				{Text: "Repeated", Ms: 10000},
+				{Text: "Repeated", Ms: 20000},
+				{Text: "Repeated", Ms: 30000},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "multiple timestamps with 3-digit fractions",
+			content: `[00:01.500][00:02.500]X`,
+			want: []LyricEntry{
+				{Text: "X", Ms: 1500},
+				{Text: "X", Ms: 2500},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

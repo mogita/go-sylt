@@ -47,28 +47,52 @@ func parseLyrics(content string, filename string) ([]LyricEntry, error) {
 	}
 }
 
-// parseLRC parses LRC format with both [mm:ss.xx] and [mm:ss.xxx] timestamps
+// parseLRC parses LRC format. Lines may contain one or more leading
+// [mm:ss.xx] or [mm:ss.xxx] timestamps; each timestamp produces an entry
+// pointing at the same text.
 func parseLRC(content string) ([]LyricEntry, error) {
 	var entries []LyricEntry
-	lrcRegex := regexp.MustCompile(`\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)`)
+	tsRegex := regexp.MustCompile(`\[(\d{2}):(\d{2})\.(\d{2,3})\]`)
 
 	for _, line := range strings.Split(content, "\n") {
-		matches := lrcRegex.FindStringSubmatch(strings.TrimSpace(line))
-		if len(matches) == 5 {
-			minutes, _ := strconv.Atoi(matches[1])
-			seconds, _ := strconv.Atoi(matches[2])
-			fracStr := matches[3]
-			text := strings.TrimSpace(matches[4])
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 
-			if text == "" {
-				continue
+		matches := tsRegex.FindAllStringSubmatchIndex(line, -1)
+		if len(matches) == 0 {
+			continue
+		}
+
+		// Verify all matches form a contiguous prefix at the start of the line.
+		prefixEnd := 0
+		valid := true
+		for _, m := range matches {
+			if m[0] != prefixEnd {
+				valid = false
+				break
 			}
+			prefixEnd = m[1]
+		}
+		if !valid {
+			continue
+		}
 
-			// Handle both 2 and 3 digit fractions
+		text := strings.TrimSpace(line[prefixEnd:])
+		if text == "" {
+			continue
+		}
+
+		for _, m := range matches {
+			minutes, _ := strconv.Atoi(line[m[2]:m[3]])
+			seconds, _ := strconv.Atoi(line[m[4]:m[5]])
+			fracStr := line[m[6]:m[7]]
+
 			var milliseconds int
 			if len(fracStr) == 2 {
 				milliseconds, _ = strconv.Atoi(fracStr)
-				milliseconds *= 10 // Convert centiseconds to milliseconds
+				milliseconds *= 10
 			} else {
 				milliseconds, _ = strconv.Atoi(fracStr)
 			}
