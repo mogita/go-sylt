@@ -157,50 +157,60 @@ func parseSRT(content string) ([]LyricEntry, error) {
 	return entries, nil
 }
 
-// parseVTT parses WebVTT format
+// parseVTT parses WebVTT format. Timestamps may be either mm:ss.mmm or
+// hh:mm:ss.mmm and any amount of whitespace is permitted around the
+// '-->' separator. The optional WEBVTT header line is skipped if present.
 func parseVTT(content string) ([]LyricEntry, error) {
 	var entries []LyricEntry
 	lines := strings.Split(content, "\n")
 
-	// Skip WEBVTT header
 	start := 0
 	for i, line := range lines {
-		if strings.HasPrefix(line, "WEBVTT") {
+		if strings.HasPrefix(strings.TrimSpace(line), "WEBVTT") {
 			start = i + 1
 			break
 		}
 	}
 
-	vttRegex := regexp.MustCompile(`(\d{2}):(\d{2})\.(\d{3})\s*-->\s*\d{2}:\d{2}\.\d{3}`)
+	// Capture groups: 1=h? (optional), 2=mm, 3=ss, 4=mmm. End side ignored.
+	// Per the WebVTT spec, minutes and seconds are exactly 2 digits and
+	// milliseconds are exactly 3 digits; hours (when present) may be any
+	// length.
+	vttRegex := regexp.MustCompile(`(?:(\d+):)?(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(?:\d+:)?\d{2}:\d{2}\.\d{3}`)
 
 	for i := start; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		matches := vttRegex.FindStringSubmatch(line)
-		if len(matches) == 4 {
-			minutes, _ := strconv.Atoi(matches[1])
-			seconds, _ := strconv.Atoi(matches[2])
-			milliseconds, _ := strconv.Atoi(matches[3])
-
-			// Get text from next non-empty line
-			text := ""
-			for j := i + 1; j < len(lines); j++ {
-				nextLine := strings.TrimSpace(lines[j])
-				if nextLine == "" {
-					break
-				}
-				if text != "" {
-					text += " "
-				}
-				text += nextLine
-			}
-
-			if text == "" {
-				continue
-			}
-
-			totalMs := uint32((minutes*60+seconds)*1000 + milliseconds)
-			entries = append(entries, LyricEntry{Text: text, Ms: totalMs})
+		if len(matches) != 5 {
+			continue
 		}
+
+		hours := 0
+		if matches[1] != "" {
+			hours, _ = strconv.Atoi(matches[1])
+		}
+		minutes, _ := strconv.Atoi(matches[2])
+		seconds, _ := strconv.Atoi(matches[3])
+		milliseconds, _ := strconv.Atoi(matches[4])
+
+		text := ""
+		for j := i + 1; j < len(lines); j++ {
+			nextLine := strings.TrimSpace(lines[j])
+			if nextLine == "" {
+				break
+			}
+			if text != "" {
+				text += " "
+			}
+			text += nextLine
+		}
+
+		if text == "" {
+			continue
+		}
+
+		totalMs := uint32((hours*3600+minutes*60+seconds)*1000 + milliseconds)
+		entries = append(entries, LyricEntry{Text: text, Ms: totalMs})
 	}
 
 	if len(entries) == 0 {

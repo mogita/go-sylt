@@ -215,6 +215,56 @@ Line two`,
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "VTT with hours",
+			content: `WEBVTT
+
+01:00:12.340 --> 01:00:15.000
+Line one
+
+01:00:25.670 --> 01:00:28.000
+Line two`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 3612340},
+				{Text: "Line two", Ms: 3625670},
+			},
+			wantErr: false,
+		},
+		{
+			name: "VTT mixed hours and no-hours",
+			content: `WEBVTT
+
+00:12.340 --> 00:15.000
+Line one
+
+01:00:25.670 --> 01:00:28.000
+Line two`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 12340},
+				{Text: "Line two", Ms: 3625670},
+			},
+			wantErr: false,
+		},
+		{
+			name: "VTT with extra whitespace around arrow",
+			content: `WEBVTT
+
+00:12.340  -->  00:15.000
+Line one`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 12340},
+			},
+			wantErr: false,
+		},
+		{
+			name: "VTT without WEBVTT header",
+			content: `00:12.340 --> 00:15.000
+Line one`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 12340},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
