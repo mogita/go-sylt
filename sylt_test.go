@@ -86,6 +86,36 @@ func TestParseLRC(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name:    "multiple timestamps on one line",
+			content: `[00:10.00][00:20.00]Chorus line`,
+			want: []LyricEntry{
+				{Text: "Chorus line", Ms: 10000},
+				{Text: "Chorus line", Ms: 20000},
+			},
+			wantErr: false,
+		},
+		{
+			name: "mixed single and multi-timestamp lines",
+			content: `[00:05.00]Intro
+[00:10.00][00:20.00][00:30.00]Repeated`,
+			want: []LyricEntry{
+				{Text: "Intro", Ms: 5000},
+				{Text: "Repeated", Ms: 10000},
+				{Text: "Repeated", Ms: 20000},
+				{Text: "Repeated", Ms: 30000},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "multiple timestamps with 3-digit fractions",
+			content: `[00:01.500][00:02.500]X`,
+			want: []LyricEntry{
+				{Text: "X", Ms: 1500},
+				{Text: "X", Ms: 2500},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -184,6 +214,68 @@ Line two`,
 			content: `WEBVTT`,
 			want:    nil,
 			wantErr: true,
+		},
+		{
+			name: "VTT with hours",
+			content: `WEBVTT
+
+01:00:12.340 --> 01:00:15.000
+Line one
+
+01:00:25.670 --> 01:00:28.000
+Line two`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 3612340},
+				{Text: "Line two", Ms: 3625670},
+			},
+			wantErr: false,
+		},
+		{
+			name: "VTT mixed hours and no-hours",
+			content: `WEBVTT
+
+00:12.340 --> 00:15.000
+Line one
+
+01:00:25.670 --> 01:00:28.000
+Line two`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 12340},
+				{Text: "Line two", Ms: 3625670},
+			},
+			wantErr: false,
+		},
+		{
+			name: "VTT with extra whitespace around arrow",
+			content: `WEBVTT
+
+00:12.340  -->  00:15.000
+Line one`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 12340},
+			},
+			wantErr: false,
+		},
+		{
+			name: "VTT without WEBVTT header",
+			content: `00:12.340 --> 00:15.000
+Line one`,
+			want: []LyricEntry{
+				{Text: "Line one", Ms: 12340},
+			},
+			wantErr: false,
+		},
+		{
+			name: "VTT body containing timestamp-like text is not re-parsed",
+			content: `WEBVTT
+
+00:01.000 --> 00:02.000
+00:99.999 --> 00:50.000
+followup line`,
+			want: []LyricEntry{
+				{Text: "00:99.999 --> 00:50.000 followup line", Ms: 1000},
+			},
+			wantErr: false,
 		},
 	}
 
