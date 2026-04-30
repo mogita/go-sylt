@@ -45,12 +45,13 @@ func main() {
 		mp3File := args[0]
 		lyricsFile := args[1]
 
-		if err := validateLanguageCode(lang); err != nil {
+		normLang, err := normalizeLanguageCode(lang)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 
-		if err := processFiles(mp3File, lyricsFile, lang); err != nil {
+		if err := processFiles(mp3File, lyricsFile, normLang); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}

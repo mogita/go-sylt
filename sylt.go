@@ -45,6 +45,16 @@ func validateLanguageCode(lang string) error {
 	return nil
 }
 
+// normalizeLanguageCode lowercases the input and validates it as a 3-letter
+// ISO 639-2 code. Returns the normalized code on success.
+func normalizeLanguageCode(lang string) (string, error) {
+	lower := strings.ToLower(lang)
+	if err := validateLanguageCode(lower); err != nil {
+		return "", err
+	}
+	return lower, nil
+}
+
 // parseLyrics detects format and parses lyrics file
 func parseLyrics(content string, filename string) ([]LyricEntry, error) {
 	ext := strings.ToLower(filepath.Ext(filename))

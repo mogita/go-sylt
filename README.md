@@ -11,7 +11,7 @@
 ## Features
 
 - Supported input formats: LRC, SRT, and VTT
-- Configurable language codes (ISO 639-2 format)
+- Configurable language codes (case-insensitive 3-letter ISO 639-2/B codes, e.g. `eng`, `zho`, `und`)
 - Read and display existing SYLT lyrics from MP3 files
 - Creates output files with " - sylt" suffix to preserve originals
 
@@ -52,6 +52,21 @@ go-sylt [--lang <code>] <mp3_file> [lyrics_file]
 # Read existing SYLT lyrics from MP3 file and display
 ./go-sylt song.mp3
 ```
+
+### Language codes
+
+`--lang` accepts any 3-letter ISO 639-2 code and is case-insensitive (`ENG`, `Eng`, and `eng` are all accepted and stored as `eng`). Common values:
+
+- `eng` — English
+- `zho` — Chinese
+- `jpn` — Japanese
+- `kor` — Korean
+- `spa` — Spanish
+- `fra` — French
+- `deu` — German
+- `und` — undetermined (default)
+
+For the full list, see the [ISO 639-2 language code list](https://www.loc.gov/standards/iso639-2/php/code_list.php).
 
 ## Output
 
