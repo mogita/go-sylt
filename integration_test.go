@@ -57,7 +57,7 @@ func TestProcessFiles_OriginalUnmodified(t *testing.T) {
 	}
 }
 
-func TestProcessFiles_LargeFileStreaming(t *testing.T) {
+func TestProcessFiles_LargeFileRoundtrip(t *testing.T) {
 	tempDir := t.TempDir()
 	mp3Path := filepath.Join(tempDir, "big.mp3")
 
