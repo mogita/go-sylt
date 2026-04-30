@@ -250,6 +250,7 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 	// Open the copy and add the SYLT frame
 	newTag, err := id3v2.Open(outputPath, id3v2.Options{Parse: true})
 	if err != nil {
+		os.Remove(outputPath)
 		return fmt.Errorf("failed to open output MP3 file: %v", err)
 	}
 	defer func() {
@@ -261,6 +262,7 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 	newTag.AddFrame("SYLT", id3v2.UnknownFrame{Body: payload})
 
 	if err := newTag.Save(); err != nil {
+		os.Remove(outputPath)
 		return fmt.Errorf("failed to save MP3 file: %v", err)
 	}
 
@@ -285,7 +287,11 @@ func copyFile(src, dst string) error {
 		os.Remove(dst)
 		return err
 	}
-	return out.Close()
+	if err := out.Close(); err != nil {
+		os.Remove(dst)
+		return err
+	}
+	return nil
 }
 
 // parseSYLTFrame parses SYLT frame data and returns entries and language code
