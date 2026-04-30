@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -71,28 +72,52 @@ func parseLyrics(content string, filename string) ([]LyricEntry, error) {
 	}
 }
 
-// parseLRC parses LRC format with both [mm:ss.xx] and [mm:ss.xxx] timestamps
+// parseLRC parses LRC format. Lines may contain one or more leading
+// [mm:ss.xx] or [mm:ss.xxx] timestamps; each timestamp produces an entry
+// pointing at the same text.
 func parseLRC(content string) ([]LyricEntry, error) {
 	var entries []LyricEntry
-	lrcRegex := regexp.MustCompile(`\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)`)
+	tsRegex := regexp.MustCompile(`\[(\d{2}):(\d{2})\.(\d{2,3})\]`)
 
 	for _, line := range strings.Split(content, "\n") {
-		matches := lrcRegex.FindStringSubmatch(strings.TrimSpace(line))
-		if len(matches) == 5 {
-			minutes, _ := strconv.Atoi(matches[1])
-			seconds, _ := strconv.Atoi(matches[2])
-			fracStr := matches[3]
-			text := strings.TrimSpace(matches[4])
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 
-			if text == "" {
-				continue
+		matches := tsRegex.FindAllStringSubmatchIndex(line, -1)
+		if len(matches) == 0 {
+			continue
+		}
+
+		// Verify all matches form a contiguous prefix at the start of the line.
+		prefixEnd := 0
+		valid := true
+		for _, m := range matches {
+			if m[0] != prefixEnd {
+				valid = false
+				break
 			}
+			prefixEnd = m[1]
+		}
+		if !valid {
+			continue
+		}
 
-			// Handle both 2 and 3 digit fractions
+		text := strings.TrimSpace(line[prefixEnd:])
+		if text == "" {
+			continue
+		}
+
+		for _, m := range matches {
+			minutes, _ := strconv.Atoi(line[m[2]:m[3]])
+			seconds, _ := strconv.Atoi(line[m[4]:m[5]])
+			fracStr := line[m[6]:m[7]]
+
 			var milliseconds int
 			if len(fracStr) == 2 {
 				milliseconds, _ = strconv.Atoi(fracStr)
-				milliseconds *= 10 // Convert centiseconds to milliseconds
+				milliseconds *= 10
 			} else {
 				milliseconds, _ = strconv.Atoi(fracStr)
 			}
@@ -157,50 +182,62 @@ func parseSRT(content string) ([]LyricEntry, error) {
 	return entries, nil
 }
 
-// parseVTT parses WebVTT format
+// parseVTT parses WebVTT format. Timestamps may be either mm:ss.mmm or
+// hh:mm:ss.mmm and any amount of whitespace is permitted around the
+// '-->' separator. The optional WEBVTT header line is skipped if present.
 func parseVTT(content string) ([]LyricEntry, error) {
 	var entries []LyricEntry
 	lines := strings.Split(content, "\n")
 
-	// Skip WEBVTT header
 	start := 0
 	for i, line := range lines {
-		if strings.HasPrefix(line, "WEBVTT") {
+		if strings.HasPrefix(strings.TrimSpace(line), "WEBVTT") {
 			start = i + 1
 			break
 		}
 	}
 
-	vttRegex := regexp.MustCompile(`(\d{2}):(\d{2})\.(\d{3})\s*-->\s*\d{2}:\d{2}\.\d{3}`)
+	// Capture groups: 1=h? (optional), 2=mm, 3=ss, 4=mmm. End side ignored.
+	// Per the WebVTT spec, minutes and seconds are exactly 2 digits and
+	// milliseconds are exactly 3 digits; hours (when present) may be any
+	// length.
+	vttRegex := regexp.MustCompile(`(?:(\d+):)?(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(?:\d+:)?\d{2}:\d{2}\.\d{3}`)
 
 	for i := start; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		matches := vttRegex.FindStringSubmatch(line)
-		if len(matches) == 4 {
-			minutes, _ := strconv.Atoi(matches[1])
-			seconds, _ := strconv.Atoi(matches[2])
-			milliseconds, _ := strconv.Atoi(matches[3])
-
-			// Get text from next non-empty line
-			text := ""
-			for j := i + 1; j < len(lines); j++ {
-				nextLine := strings.TrimSpace(lines[j])
-				if nextLine == "" {
-					break
-				}
-				if text != "" {
-					text += " "
-				}
-				text += nextLine
-			}
-
-			if text == "" {
-				continue
-			}
-
-			totalMs := uint32((minutes*60+seconds)*1000 + milliseconds)
-			entries = append(entries, LyricEntry{Text: text, Ms: totalMs})
+		if len(matches) != 5 {
+			continue
 		}
+
+		hours := 0
+		if matches[1] != "" {
+			hours, _ = strconv.Atoi(matches[1])
+		}
+		minutes, _ := strconv.Atoi(matches[2])
+		seconds, _ := strconv.Atoi(matches[3])
+		milliseconds, _ := strconv.Atoi(matches[4])
+
+		text := ""
+		j := i + 1
+		for ; j < len(lines); j++ {
+			nextLine := strings.TrimSpace(lines[j])
+			if nextLine == "" {
+				break
+			}
+			if text != "" {
+				text += " "
+			}
+			text += nextLine
+		}
+		i = j // skip past consumed text lines so they aren't re-scanned
+
+		if text == "" {
+			continue
+		}
+
+		totalMs := uint32((hours*3600+minutes*60+seconds)*1000 + milliseconds)
+		entries = append(entries, LyricEntry{Text: text, Ms: totalMs})
 	}
 
 	if len(entries) == 0 {
@@ -266,38 +303,21 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 		return fmt.Errorf("failed to parse lyrics: %v", err)
 	}
 
-	// Open MP3 file to read tags
-	tag, err := id3v2.Open(mp3File, id3v2.Options{Parse: true})
-	if err != nil {
-		return fmt.Errorf("failed to open MP3 file: %v", err)
-	}
-	defer func() {
-		if closeErr := tag.Close(); closeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close MP3 file: %v\n", closeErr)
-		}
-	}()
-
-	// Build and add SYLT frame
+	// Build SYLT payload
 	payload := buildSYLT(entries, lang)
-	tag.AddFrame("SYLT", id3v2.UnknownFrame{Body: payload})
 
-	// Generate output path and save
+	// Generate output path
 	outputPath := getOutputPath(mp3File)
 
-	// Copy original file to new location first
-	input, err := os.ReadFile(mp3File)
-	if err != nil {
-		return fmt.Errorf("failed to read original MP3 file: %v", err)
-	}
-	if err := os.WriteFile(outputPath, input, 0644); err != nil {
-		return fmt.Errorf("failed to create output file: %v", err)
+	// Stream-copy the source MP3 to the output path
+	if err := copyFile(mp3File, outputPath); err != nil {
+		return fmt.Errorf("failed to copy MP3 to output: %v", err)
 	}
 
-	// The tag will be closed by the defer function
-
-	// Open the new file and add SYLT frame
+	// Open the copy and add the SYLT frame
 	newTag, err := id3v2.Open(outputPath, id3v2.Options{Parse: true})
 	if err != nil {
+		os.Remove(outputPath)
 		return fmt.Errorf("failed to open output MP3 file: %v", err)
 	}
 	defer func() {
@@ -306,13 +326,38 @@ func processFiles(mp3File, lyricsFile, lang string) error {
 		}
 	}()
 
-	// Add SYLT frame to new file
 	newTag.AddFrame("SYLT", id3v2.UnknownFrame{Body: payload})
 
 	if err := newTag.Save(); err != nil {
+		os.Remove(outputPath)
 		return fmt.Errorf("failed to save MP3 file: %v", err)
 	}
 
+	return nil
+}
+
+// copyFile streams src to dst using io.Copy to avoid loading large files into memory.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		os.Remove(dst)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(dst)
+		return err
+	}
 	return nil
 }
 
