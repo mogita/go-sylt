@@ -12,6 +12,20 @@ import (
 	id3v2 "github.com/bogem/id3v2/v2"
 )
 
+// SYLT frame byte constants per the ID3v2.4 SYLT spec.
+const (
+	encodingISO88591 byte = 0x00 // ISO-8859-1 (Latin-1)
+	encodingUTF16BOM byte = 0x01 // UTF-16 with BOM
+	encodingUTF16BE  byte = 0x02 // UTF-16 big-endian, no BOM
+	encodingUTF8     byte = 0x03 // UTF-8
+
+	timestampFormatMilliseconds byte = 0x02 // absolute milliseconds
+
+	contentTypeLyrics byte = 0x01
+
+	nullByte byte = 0x00
+)
+
 type LyricEntry struct {
 	Text string
 	Ms   uint32
@@ -188,15 +202,15 @@ func parseVTT(content string) ([]LyricEntry, error) {
 // buildSYLT creates SYLT frame payload
 func buildSYLT(entries []LyricEntry, lang string) []byte {
 	buf := make([]byte, 0, 128)
-	buf = append(buf, 0x03)            // text encoding UTF-8
-	buf = append(buf, []byte(lang)...) // language (3 bytes)
-	buf = append(buf, 0x02)            // timestamp format: milliseconds
-	buf = append(buf, 0x01)            // content type: lyrics
-	buf = append(buf, 0x00)            // empty content descriptor (UTF-8 NUL)
+	buf = append(buf, encodingUTF8)                // text encoding UTF-8
+	buf = append(buf, []byte(lang)...)             // language (3 bytes)
+	buf = append(buf, timestampFormatMilliseconds) // timestamp format
+	buf = append(buf, contentTypeLyrics)           // content type
+	buf = append(buf, nullByte)                    // empty content descriptor terminator
 
 	for _, entry := range entries {
 		buf = append(buf, []byte(entry.Text)...)
-		buf = append(buf, 0x00) // UTF-8 terminator
+		buf = append(buf, nullByte) // text terminator
 		ts := make([]byte, 4)
 		binary.BigEndian.PutUint32(ts, entry.Ms)
 		buf = append(buf, ts...)
@@ -295,12 +309,12 @@ func parseSYLTFrame(frameData []byte) ([]LyricEntry, string, error) {
 	encoding := frameData[0]
 	lang := string(frameData[1:4])
 	timestampFormat := frameData[4]
-	if timestampFormat != 0x02 {
+	if timestampFormat != timestampFormatMilliseconds {
 		return nil, "", fmt.Errorf("unsupported timestamp format: 0x%02x", timestampFormat)
 	}
 
 	contentType := frameData[5]
-	if contentType != 0x01 {
+	if contentType != contentTypeLyrics {
 		return nil, "", fmt.Errorf("unsupported content type: 0x%02x", contentType)
 	}
 
@@ -340,16 +354,16 @@ func parseSYLTFrame(frameData []byte) ([]LyricEntry, string, error) {
 // getTextTerminator returns the terminator bytes for the given encoding
 func getTextTerminator(encoding byte) []byte {
 	switch encoding {
-	case 0x00: // ISO-8859-1 (Latin1)
-		return []byte{0x00}
-	case 0x01: // UTF-16 with BOM
-		return []byte{0x00, 0x00}
-	case 0x02: // UTF-16BE without BOM
-		return []byte{0x00, 0x00}
-	case 0x03: // UTF-8
-		return []byte{0x00}
+	case encodingISO88591:
+		return []byte{nullByte}
+	case encodingUTF16BOM:
+		return []byte{nullByte, nullByte}
+	case encodingUTF16BE:
+		return []byte{nullByte, nullByte}
+	case encodingUTF8:
+		return []byte{nullByte}
 	default:
-		return []byte{0x00} // fallback to single byte
+		return []byte{nullByte} // fallback to single byte
 	}
 }
 
@@ -382,7 +396,7 @@ func readEncodedText(data []byte, pos int, encoding byte) (string, int, error) {
 
 	// For UTF-16, we need to advance by 2 bytes at a time to maintain alignment
 	step := 1
-	if encoding == 0x01 || encoding == 0x02 {
+	if encoding == encodingUTF16BOM || encoding == encodingUTF16BE {
 		step = 2
 	}
 
@@ -424,14 +438,14 @@ func readEncodedText(data []byte, pos int, encoding byte) (string, int, error) {
 // decodeText decodes text bytes according to the specified encoding
 func decodeText(data []byte, encoding byte) (string, error) {
 	switch encoding {
-	case 0x00: // ISO-8859-1 (Latin1)
+	case encodingISO88591: // ISO-8859-1 (Latin1)
 		// Convert Latin1 to UTF-8
 		runes := make([]rune, len(data))
 		for i, b := range data {
 			runes[i] = rune(b)
 		}
 		return string(runes), nil
-	case 0x01: // UTF-16 with BOM
+	case encodingUTF16BOM: // UTF-16 with BOM
 		if len(data) == 0 {
 			return "", nil
 		}
@@ -449,9 +463,9 @@ func decodeText(data []byte, encoding byte) (string, error) {
 			// No BOM, assume little endian (common default)
 			return decodeUTF16LE(data)
 		}
-	case 0x02: // UTF-16BE without BOM
+	case encodingUTF16BE: // UTF-16BE without BOM
 		return decodeUTF16BE(data)
-	case 0x03: // UTF-8
+	case encodingUTF8: // UTF-8
 		return string(data), nil
 	default:
 		return "", fmt.Errorf("unsupported encoding: 0x%02x", encoding)
