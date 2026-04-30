@@ -209,7 +209,14 @@ func parseVTT(content string) ([]LyricEntry, error) {
 	return entries, nil
 }
 
-// buildSYLT creates SYLT frame payload
+// buildSYLT creates a SYLT frame payload per the ID3v2.4 spec.
+//
+// The payload always uses UTF-8 text encoding (encodingUTF8), milliseconds
+// timestamp format (timestampFormatMilliseconds), and the lyrics content
+// type (contentTypeLyrics). Other ID3v2 encodings (Latin-1, UTF-16 with
+// BOM, UTF-16BE) and content types are handled on read in parseSYLTFrame
+// but are not currently produced on write — see README "Encoding" for the
+// rationale and parseSYLTFrame for the read-side support.
 func buildSYLT(entries []LyricEntry, lang string) []byte {
 	buf := make([]byte, 0, 128)
 	buf = append(buf, encodingUTF8)                // text encoding UTF-8

@@ -74,6 +74,18 @@ The tool creates a new MP3 file with the same name as the input file but with " 
 
 - Input: `song.mp3` → Output: `song - sylt.mp3`
 
+## Encoding
+
+When writing SYLT frames, `go-sylt` always uses:
+
+- **Text encoding:** UTF-8 (ID3v2 encoding byte `0x03`)
+- **Timestamp format:** absolute milliseconds (`0x02`)
+- **Content type:** lyrics (`0x01`)
+
+This matches the format used by most modern players and avoids surrogate-pair pitfalls that affect UTF-16 handling. When reading SYLT frames, all four ID3v2 text encodings are supported (ISO-8859-1, UTF-16 with BOM, UTF-16 big-endian, UTF-8) so files written by other tools are readable.
+
+If you need to write a non-UTF-8 SYLT frame, please open an issue describing your use case.
+
 ## Credits
 
 - [github.com/bogem/id3v2/v2](https://github.com/bogem/id3v2) - ID3v2 tag manipulation
